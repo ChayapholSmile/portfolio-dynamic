@@ -1,1 +1,39 @@
-'use client'; import { useState } from 'react'; import { useRouter } from 'next/navigation'; export default function ChangePasswordPage(){ const r = useRouter(); const [oldPassword,setOld]=useState('admin'); const [newPassword,setNew]=useState(''); const [err,setErr]=useState(''); const [ok,setOk]=useState(''); const submit=async()=>{ setErr(''); setOk(''); const res=await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({oldPassword,newPassword})}); const data=await res.json(); if(!res.ok){ setErr(data.error||'เปลี่ยนรหัสผ่านล้มเหลว'); return; } setOk('เปลี่ยนรหัสผ่านสำเร็จ'); setTimeout(()=>r.push('/admin'),800); }; return (<div className="card max-w-md mx-auto p-6"><h1 className="text-2xl font-bold mb-4">เปลี่ยนรหัสผ่าน (จำเป็น)</h1>{err && <div className="text-red-400 mb-2">{err}</div>}{ok && <div className="text-green-400 mb-2">{ok}</div>}<label className="label">รหัสผ่านเดิม</label><input type="password" className="input mb-3" value={oldPassword} onChange={e=>setOld(e.target.value)}/><label className="label">รหัสผ่านใหม่</label><input type="password" className="input mb-4" value={newPassword} onChange={e=>setNew(e.target.value)}/><button className="btn w-full" onClick={submit}>บันทึก</button></div>); }
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function ChangePasswordPage(){
+  const r = useRouter();
+  const [oldPassword,setOld]=useState('admin');
+  const [newPassword,setNew]=useState('');
+  const [err,setErr]=useState('');
+  const [ok,setOk]=useState('');
+
+  const submit=async()=>{
+    setErr('');
+    setOk('');
+    const res=await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({oldPassword,newPassword})});
+    const data=await res.json();
+    if(!res.ok){
+      setErr(data.error||'เปลี่ยนรหัสผ่านล้มเหลว');
+      return;
+    }
+    setOk('เปลี่ยนรหัสผ่านสำเร็จ');
+    setTimeout(()=> {
+      window.location.href = '/admin';
+    }, 800);
+  };
+
+  return (
+    <div className="card max-w-md mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">เปลี่ยนรหัสผ่าน (จำเป็น)</h1>
+      {err && <div className="text-red-400 mb-2">{err}</div>}
+      {ok && <div className="text-green-400 mb-2">{ok}</div>}
+      <label className="label">รหัสผ่านเดิม</label>
+      <input type="password" className="input mb-3" value={oldPassword} onChange={e=>setOld(e.target.value)}/>
+      <label className="label">รหัสผ่านใหม่</label>
+      <input type="password" className="input mb-4" value={newPassword} onChange={e=>setNew(e.target.value)}/>
+      <button className="btn w-full" onClick={submit}>บันทึก</button>
+    </div>
+  );
+}
