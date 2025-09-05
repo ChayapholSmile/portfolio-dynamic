@@ -3,6 +3,15 @@ import { verify } from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
+// Helper function to create a redirect response with anti-caching headers
+function createRedirect(url) {
+  const response = NextResponse.redirect(url);
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  return response;
+}
+
 export function middleware(req) {
   const url = req.nextUrl;
   const loginUrl = new URL('/admin/login', req.url);
@@ -15,11 +24,9 @@ export function middleware(req) {
   // กรณีไม่มี Token
   if (!token) {
     if (onLoginPage) {
-      // ถ้าอยู่ที่หน้า login อยู่แล้ว ก็อนุญาตให้เข้า
       return NextResponse.next();
     }
-    // ถ้าพยายามเข้าหน้าอื่น ให้ส่งไปหน้า login
-    return NextResponse.redirect(loginUrl);
+    return createRedirect(loginUrl);
   }
 
   // กรณีมี Token ให้ตรวจสอบความถูกต้อง
@@ -30,26 +37,21 @@ export function middleware(req) {
     // ตรรกะสำหรับผู้ใช้ที่ "ต้อง" เปลี่ยนรหัสผ่าน
     if (decoded.mustChangePassword) {
       if (onChangePasswordPage) {
-        // อยู่ถูกหน้าแล้ว (หน้าเปลี่ยนรหัสผ่าน) อนุญาตให้เข้า
         return NextResponse.next();
       }
-      // อยู่ผิดหน้า บังคับให้ไปหน้าเปลี่ยนรหัสผ่าน
-      return NextResponse.redirect(changePasswordUrl);
+      return createRedirect(changePasswordUrl);
     } 
     
     // ตรรกะสำหรับผู้ใช้ที่ "ไม่ต้อง" เปลี่ยนรหัสผ่าน
     else {
       if (onLoginPage || onChangePasswordPage) {
-        // ไม่ควรอยู่ที่หน้า login หรือหน้าเปลี่ยนรหัสผ่าน ให้ส่งไปหน้า admin หลัก
-        return NextResponse.redirect(adminHomeUrl);
+        return createRedirect(adminHomeUrl);
       }
-      // อยู่ในหน้า admin อื่นๆ ที่ถูกต้องแล้ว อนุญาตให้เข้า
       return NextResponse.next();
     }
   } catch (error) {
-    // หาก Token ไม่ถูกต้อง (เช่น หมดอายุ, ผิดรูปแบบ)
-    // ให้ส่งไปหน้า login พร้อมกับล้าง cookie ที่ไม่ถูกต้องทิ้ง
-    const response = NextResponse.redirect(loginUrl);
+    // หาก Token ไม่ถูกต้อง ให้ส่งไปหน้า login พร้อมล้าง cookie
+    const response = createRedirect(loginUrl);
     response.cookies.set('session', '', { maxAge: -1 });
     return response;
   }
