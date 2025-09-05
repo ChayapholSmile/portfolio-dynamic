@@ -1,0 +1,1 @@
+import mongoose from 'mongoose'; const UserSchema = new mongoose.Schema({ username:{type:String,unique:true,required:true}, passwordHash:String, role:{type:String,enum:['admin','contributor'],default:'contributor'}, mustChangePassword:{type:Boolean,default:false}, createdAt:{type:Date,default:Date.now} }); export default mongoose.models.User || mongoose.model('User', UserSchema);

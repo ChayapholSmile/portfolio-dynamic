@@ -1,0 +1,1 @@
+import mongoose from 'mongoose'; const ChatMessageSchema = new mongoose.Schema({ room:String, author:{type:mongoose.Schema.Types.ObjectId,ref:'User'}, authorName:String, message:String, createdAt:{type:Date,default:Date.now} }); export default mongoose.models.ChatMessage || mongoose.model('ChatMessage', ChatMessageSchema);
