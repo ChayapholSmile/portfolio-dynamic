@@ -1,0 +1,1 @@
+import { NextResponse } from 'next/server'; import { getUserFromCookie } from '../../../../lib/jwt'; export async function GET(){ const me = getUserFromCookie(); return NextResponse.json({ user: me || null }); }
