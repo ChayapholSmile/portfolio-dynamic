@@ -3,64 +3,69 @@ import { verify } from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
+function getLoginRedirect(req) {
+  const url = req.nextUrl.clone();
+  url.pathname = '/admin/login';
+  const res = NextResponse.redirect(url);
+  // เคลียร์ cookie ที่อาจไม่ถูกต้องออก
+  res.cookies.delete('session');
+  return res;
+}
+
 export function middleware(req) {
   const url = req.nextUrl.clone();
   const token = req.cookies.get('session')?.value;
+  const isProtected = url.pathname.startsWith('/admin');
   const isLoginPage = url.pathname.startsWith('/admin/login');
 
-  // กรณีผู้ใช้พยายามเข้าหน้าล็อกอิน
-  if (isLoginPage) {
-    if (token) {
-      try {
-        const decoded = verify(token, JWT_SECRET);
-        // ถ้ามี token ที่ถูกต้อง ให้ redirect ออกจากหน้าล็อกอิน
-        url.pathname = decoded?.mustChangePassword ? '/admin/change-password' : '/admin';
-        return NextResponse.redirect(url);
-      } catch (e) {
-        // ถ้า token ไม่ถูกต้อง ให้ลบ cookie ที่เสียออก แล้วให้เข้าหน้าล็อกอินใหม่
-        const response = NextResponse.next();
-        response.cookies.delete('session');
-        return response;
-      }
-    }
-    // ถ้าไม่มี token ให้เข้าหน้าล็อกอินได้เลย
+  // ถ้าไม่ใช่หน้าที่ต้องป้องกัน ให้ไปต่อ
+  if (!isProtected) {
     return NextResponse.next();
   }
-  
-  // กรณีผู้ใช้พยายามเข้าหน้าแอดมินอื่นๆ ที่ไม่ใช่หน้าล็อกอิน
-  if (url.pathname.startsWith('/admin')) {
-    if (!token) {
-      // ถ้าไม่มี token ให้ redirect ไปหน้าล็อกอิน
-      url.pathname = '/admin/login';
+
+  // --- กรณีไม่มี Token ---
+  if (!token) {
+    // ถ้าพยายามเข้าหน้าแอดมิน (ที่ไม่ใช่หน้า login) ให้ redirect ไปหน้า login
+    if (!isLoginPage) {
+      return getLoginRedirect(req);
+    }
+    // ถ้าอยู่ที่หน้า login อยู่แล้ว และไม่มี token ก็ให้เข้าได้
+    return NextResponse.next();
+  }
+
+  // --- กรณีมี Token ---
+  try {
+    const decoded = verify(token, JWT_SECRET);
+
+    if (isLoginPage) {
+      // ถ้าล็อกอินแล้วและพยายามเข้าหน้า login ให้ redirect ออก
+      url.pathname = decoded.mustChangePassword ? '/admin/change-password' : '/admin';
       return NextResponse.redirect(url);
     }
 
-    try {
-      const decoded = verify(token, JWT_SECRET);
-      // ตรวจสอบว่าจำเป็นต้องเปลี่ยนรหัสผ่านหรือไม่
-      if (decoded?.mustChangePassword && !url.pathname.startsWith('/admin/change-password')) {
-        url.pathname = '/admin/change-password';
-        return NextResponse.redirect(url);
-      }
-       // ถ้าผู้ใช้อยู่ในหน้าเปลี่ยนรหัสผ่าน แต่ไม่จำเป็นต้องเปลี่ยนแล้ว ให้ redirect ไปหน้าหลักของแอดมิน
-       if (!decoded?.mustChangePassword && url.pathname.startsWith('/admin/change-password')) {
+    // กรณีเข้าหน้าแอดมินอื่นๆ ที่ไม่ใช่หน้า login
+    if (decoded.mustChangePassword && !url.pathname.startsWith('/admin/change-password')) {
+      // ถ้าจำเป็นต้องเปลี่ยนรหัสผ่าน แต่ไม่ได้อยู่ที่หน้าเปลี่ยนรหัสผ่าน
+      url.pathname = '/admin/change-password';
+      return NextResponse.redirect(url);
+    }
+    
+    if (!decoded.mustChangePassword && url.pathname.startsWith('/admin/change-password')) {
+        // ถ้าไม่จำเป็นต้องเปลี่ยนรหัสผ่านแล้ว แต่อยู่ที่หน้าเปลี่ยนรหัสผ่าน
         url.pathname = '/admin';
         return NextResponse.redirect(url);
-      }
-    } catch (e) {
-      // ถ้า token ไม่ถูกต้อง ให้ redirect ไปหน้าล็อกอินและลบ cookie ที่เสียออก
-      url.pathname = '/admin/login';
-      const response = NextResponse.redirect(url);
-      response.cookies.delete('session');
-      return response;
     }
-  }
+    
+    // เงื่อนไขถูกต้องทั้งหมด อนุญาตให้เข้าถึงได้
+    return NextResponse.next();
 
-  // ถ้าไม่ใช่ route ของ admin ให้ไปต่อ
-  return NextResponse.next();
+  } catch (err) {
+    // หาก Token ไม่ถูกต้อง (เช่น หมดอายุ)
+    return getLoginRedirect(req);
+  }
 }
 
 export const config = {
-  // matcher ยังคงเดิม แต่ตรรกะภายในไฟล์จะจัดการเรื่อง redirect loop เอง
   matcher: ['/admin/:path*'],
 };
+
