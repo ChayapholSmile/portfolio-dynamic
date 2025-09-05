@@ -1,0 +1,1 @@
+export default function Base64Image({file,className=''}){ if(!file?.base64) return null; const src = `data:${file.mime};base64,${file.base64}`; return <img src={src} alt={file.name||'image'} className={className}/>; }
