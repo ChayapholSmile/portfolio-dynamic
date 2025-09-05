@@ -14,43 +14,46 @@ function createRedirect(url) {
 
 export function middleware(req) {
   const url = req.nextUrl;
+  const { pathname } = url;
   const loginUrl = new URL('/admin/login', req.url);
   const changePasswordUrl = new URL('/admin/change-password', req.url);
   const adminHomeUrl = new URL('/admin', req.url);
 
   const token = req.cookies.get('session')?.value;
-  const onLoginPage = url.pathname.startsWith('/admin/login');
 
-  // กรณีไม่มี Token
+  // 1. No Token: Must go to login page
   if (!token) {
-    if (onLoginPage) {
-      return NextResponse.next();
+    if (pathname === '/admin/login') {
+      return NextResponse.next(); // Already on login page, allow
     }
-    return createRedirect(loginUrl);
+    return createRedirect(loginUrl); // Not on login page, redirect
   }
 
-  // กรณีมี Token ให้ตรวจสอบความถูกต้อง
+  // 2. Has Token: Verify it
   try {
     const decoded = verify(token, JWT_SECRET);
-    const onChangePasswordPage = url.pathname.startsWith('/admin/change-password');
 
-    // ตรรกะสำหรับผู้ใช้ที่ "ต้อง" เปลี่ยนรหัสผ่าน
+    // 3a. User MUST change password
     if (decoded.mustChangePassword) {
-      if (onChangePasswordPage) {
-        return NextResponse.next();
+      // If user is not on the change password page, redirect them there.
+      if (pathname !== '/admin/change-password') {
+        return createRedirect(changePasswordUrl);
       }
-      return createRedirect(changePasswordUrl);
     } 
-    
-    // ตรรกะสำหรับผู้ใช้ที่ "ไม่ต้อง" เปลี่ยนรหัสผ่าน
+    // 3b. User does NOT need to change password
     else {
-      if (onLoginPage || onChangePasswordPage) {
+      // If user is trying to access login or change password pages, redirect them to admin home.
+      if (pathname === '/admin/login' || pathname === '/admin/change-password') {
         return createRedirect(adminHomeUrl);
       }
-      return NextResponse.next();
     }
+
+    // All checks passed for a logged-in user, allow request.
+    return NextResponse.next();
+
   } catch (error) {
-    // หาก Token ไม่ถูกต้อง ให้ส่งไปหน้า login พร้อมล้าง cookie
+    // Token is invalid (expired, malformed, etc.)
+    // Redirect to login and clear the invalid cookie.
     const response = createRedirect(loginUrl);
     response.cookies.set('session', '', { maxAge: -1 });
     return response;
